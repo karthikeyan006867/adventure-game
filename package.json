@@ -1,0 +1,29 @@
+{
+  "name": "epic-3d-adventure",
+  "version": "1.0.0",
+  "description": "The world's best 3D adventure game with pets, leveling, and endless possibilities",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "three": "^0.160.0",
+    "@react-three/fiber": "^8.15.0",
+    "@react-three/drei": "^9.92.0",
+    "@react-three/rapier": "^1.2.0",
+    "zustand": "^4.4.7",
+    "framer-motion": "^10.16.16"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.46",
+    "@types/react-dom": "^18.2.18",
+    "@types/three": "^0.160.0",
+    "typescript": "^5.3.3"
+  }
+}
