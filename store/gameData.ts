@@ -57,6 +57,20 @@ export const PET_TEMPLATES: Omit<Pet, 'id' | 'level' | 'xp' | 'active'>[] = [
     abilities: ['Wisdom Boost', 'Silent Strike', 'Night Vision'],
     rarity: 'common',
   },
+  {
+    name: 'Companion Slime',
+    type: 'slime',
+    stats: { attack: 8, defense: 15, speed: 12, magic: 15 },
+    abilities: ['Bounce Attack', 'Split', 'Absorb'],
+    rarity: 'common',
+  },
+  {
+    name: 'Forest Fairy',
+    type: 'fairy',
+    stats: { attack: 10, defense: 8, speed: 28, magic: 35 },
+    abilities: ['Nature Magic', 'Fairy Dust', 'Enchant'],
+    rarity: 'epic',
+  },
 ];
 
 export function generateRandomPet(): Pet {

@@ -1,9 +1,33 @@
 import { create } from 'zustand';
 
+export type PlayerClass = 
+  | 'swordsman' 
+  | 'fire-mage' 
+  | 'water-mage' 
+  | 'light-mage' 
+  | 'dark-mage' 
+  | 'earth-mage' 
+  | 'archer' 
+  | 'healer'
+  | 'summoner';
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  manaCost: number;
+  cooldown: number;
+  currentCooldown: number;
+  damage?: number;
+  healing?: number;
+  effect?: string;
+  auraColor: string;
+}
+
 export interface Pet {
   id: string;
   name: string;
-  type: 'dragon' | 'wolf' | 'phoenix' | 'tiger' | 'unicorn' | 'griffin' | 'fox' | 'owl';
+  type: 'dragon' | 'wolf' | 'phoenix' | 'tiger' | 'unicorn' | 'griffin' | 'fox' | 'owl' | 'slime' | 'fairy';
   level: number;
   xp: number;
   stats: {
@@ -48,6 +72,8 @@ export interface Quest {
 
 interface GameState {
   // Player
+  playerName: string;
+  playerClass: PlayerClass;
   playerLevel: number;
   playerXP: number;
   playerXPToNext: number;
@@ -56,10 +82,17 @@ interface GameState {
   playerRotation: number;
   isMoving: boolean;
   currentAnimation: string;
+  isekaiStoryProgress: number;
   
   // Inventory
   gold: number;
   inventory: string[];
+  
+  // Skills & Magic
+  skills: Skill[];
+  activeSkills: string[];
+  auraActive: boolean;
+  auraColor: string;
   
   // Pets
   pets: Pet[];
@@ -73,12 +106,17 @@ interface GameState {
   quests: Quest[];
   
   // Actions
+  setPlayerClass: (playerClass: PlayerClass) => void;
+  setPlayerName: (name: string) => void;
   gainXP: (amount: number) => void;
   levelUp: () => void;
   updatePlayerPosition: (position: [number, number, number]) => void;
   updatePlayerRotation: (rotation: number) => void;
   setMoving: (moving: boolean) => void;
   setAnimation: (animation: string) => void;
+  useSkill: (skillId: string) => void;
+  toggleAura: () => void;
+  updateSkillCooldowns: (delta: number) => void;
   addPet: (pet: Pet) => void;
   setActivePet: (petId: string) => void;
   addGold: (amount: number) => void;
@@ -93,14 +131,16 @@ interface GameState {
 
 export const useGameStore = create<GameState>((set, get) => ({
   // Initial Player State
+  playerName: 'Traveler',
+  playerClass: 'swordsman',
   playerLevel: 1,
   playerXP: 0,
   playerXPToNext: 100,
   playerStats: {
     health: 100,
     maxHealth: 100,
-    mana: 50,
-    maxMana: 50,
+    mana: 100,
+    maxMana: 100,
     stamina: 100,
     maxStamina: 100,
     attack: 10,
@@ -113,10 +153,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   playerRotation: 0,
   isMoving: false,
   currentAnimation: 'idle',
+  isekaiStoryProgress: 0,
   
   // Initial Inventory
-  gold: 0,
-  inventory: [],
+  gold: 100,
+  inventory: ['Health Potion', 'Mana Potion'],
+  
+  // Initial Skills
+  skills: [],
+  activeSkills: [],
+  auraActive: false,
+  auraColor: '#ffffff',
   
   // Initial Pets
   pets: [],
@@ -130,6 +177,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   quests: [],
   
   // Actions
+  setPlayerClass: (playerClass: PlayerClass) => {
+    set({ playerClass });
+  },
+  
+  setPlayerName: (name: string) => {
+    set({ playerName: name });
+  },
+  
   gainXP: (amount: number) => {
     const state = get();
     const newXP = state.playerXP + amount;
@@ -279,5 +334,42 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       playerStats: { ...state.playerStats, health: newHealth }
     });
+  },
+  
+  useSkill: (skillId: string) => {
+    const state = get();
+    const skill = state.skills.find(s => s.id === skillId);
+    
+    if (skill && skill.currentCooldown === 0 && state.playerStats.mana >= skill.manaCost) {
+      // Use skill
+      const newMana = state.playerStats.mana - skill.manaCost;
+      const updatedSkills = state.skills.map(s => 
+        s.id === skillId ? { ...s, currentCooldown: s.cooldown } : s
+      );
+      
+      set({
+        playerStats: { ...state.playerStats, mana: newMana },
+        skills: updatedSkills,
+        auraActive: true,
+        auraColor: skill.auraColor,
+      });
+      
+      // Deactivate aura after 1 second
+      setTimeout(() => set({ auraActive: false }), 1000);
+    }
+  },
+  
+  toggleAura: () => {
+    const state = get();
+    set({ auraActive: !state.auraActive });
+  },
+  
+  updateSkillCooldowns: (delta: number) => {
+    const state = get();
+    const updatedSkills = state.skills.map(skill => ({
+      ...skill,
+      currentCooldown: Math.max(0, skill.currentCooldown - delta),
+    }));
+    set({ skills: updatedSkills });
   },
 }));

@@ -6,6 +6,8 @@ import { generateRandomPet } from '@/store/gameData';
 
 export default function GameHUD() {
   const {
+    playerName,
+    playerClass,
     playerLevel,
     playerXP,
     playerXPToNext,
@@ -15,12 +17,15 @@ export default function GameHUD() {
     activePet,
     currentZone,
     quests,
+    skills,
     isMoving,
     currentAnimation,
     gainXP,
     addPet,
     setActivePet,
     discoverZone,
+    useSkill,
+    updateSkillCooldowns,
   } = useGameStore();
 
   const [showPetMenu, setShowPetMenu] = useState(false);
@@ -33,10 +38,32 @@ export default function GameHUD() {
       if (isMoving) {
         gainXP(1);
       }
+      // Update skill cooldowns
+      updateSkillCooldowns(1);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isMoving, gainXP]);
+  }, [isMoving, gainXP, updateSkillCooldowns]);
+  
+  // Skill hotkeys
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      const key = e.key;
+      if (key >= '1' && key <= '4') {
+        const index = parseInt(key) - 1;
+        if (skills[index]) {
+          const skill = skills[index];
+          if (skill.currentCooldown === 0 && playerStats.mana >= skill.manaCost) {
+            useSkill(skill.id);
+            showNotification(`✨ ${skill.name}!`);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keypress', handleKeyPress);
+    return () => window.removeEventListener('keypress', handleKeyPress);
+  }, [skills, playerStats.mana, useSkill]);
 
   // Show notification
   const showNotification = (message: string) => {
@@ -72,16 +99,20 @@ export default function GameHUD() {
       {/* Top Left - Player Stats */}
       <div style={{
         position: 'absolute',
-        top: '20px',
-        left: '20px',
-        background: 'rgba(0, 0, 0, 0.7)',
+        top: '20px',85)',
         padding: '15px',
         borderRadius: '10px',
         color: 'white',
-        minWidth: '250px',
+        minWidth: '280px',
         pointerEvents: 'auto',
+        border: '2px solid rgba(255, 215, 0, 0.3)',
       }}>
-        <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: '#ffd700' }}>
+        <h2 style={{ margin: '0 0 5px 0', fontSize: '20px', color: '#ffd700' }}>
+          {playerName}
+        </h2>
+        <div style={{ fontSize: '14px', color: '#ffaa00', marginBottom: '10px' }}>
+          Lv.{playerLevel} {playerClass.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+        </divstyle={{ margin: '0 0 10px 0', fontSize: '24px', color: '#ffd700' }}>
           Level {playerLevel} Adventurer
         </h2>
         
@@ -190,12 +221,13 @@ export default function GameHUD() {
           position: 'absolute',
           bottom: '20px',
           left: '20px',
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: 'rgba(0, 0, 0, 0.85)',
           padding: '15px',
           borderRadius: '10px',
           color: 'white',
           minWidth: '200px',
           pointerEvents: 'auto',
+          border: '2px solid rgba(255, 170, 0, 0.3)',
         }}>
           <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>🐾 Active Pet</h3>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#ffaa00', marginBottom: '5px' }}>
@@ -212,6 +244,92 @@ export default function GameHUD() {
           </div>
         </div>
       )}
+
+      {/* Bottom Center - Skill Bar */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(0, 0, 0, 0.85)',
+        padding: '15px',
+        borderRadius: '10px',
+        pointerEvents: 'auto',
+        border: '2px solid rgba(0, 170, 255, 0.3)',
+      }}>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', textAlign: 'center' }}>⚡ Skills</h3>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {skills.slice(0, 4).map((skill, index) => {
+            const onCooldown = skill.currentCooldown > 0;
+            const canUse = playerStats.mana >= skill.manaCost && !onCooldown;
+            
+            return (
+              <div
+                key={skill.id}
+                onClick={() => canUse && useSkill(skill.id)}
+                style={{
+                  width: '70px',
+                  height: '70px',
+                  background: canUse ? `linear-gradient(135deg, ${skill.auraColor}40, ${skill.auraColor}20)` : '#333',
+                  border: `2px solid ${canUse ? skill.auraColor : '#666'}`,
+                  borderRadius: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: canUse ? 'pointer' : 'not-allowed',
+                  position: 'relative',
+                  opacity: canUse ? 1 : 0.5,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (canUse) {
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                    e.currentTarget.style.boxShadow = `0 0 15px ${skill.auraColor}`;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ fontSize: '10px', fontWeight: 'bold', textAlign: 'center', marginBottom: '3px' }}>
+                  {skill.name}
+                </div>
+                <div style={{ fontSize: '9px', color: '#00ddff' }}>
+                  {skill.manaCost} MP
+                </div>
+                <div style={{ fontSize: '8px', marginTop: '2px' }}>
+                  [{index + 1}]
+                </div>
+                
+                {/* Cooldown overlay */}
+                {onCooldown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                  }}>
+                    {Math.ceil(skill.currentCooldown)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '8px', opacity: 0.7 }}>
+          Press [1-4] to use skills
+        </div>
+      </div>
 
       {/* Bottom Right - Controls */}
       <div style={{

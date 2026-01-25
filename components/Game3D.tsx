@@ -11,14 +11,18 @@ import { useGameStore } from '@/store/gameStore';
 function Player() {
   const meshRef = useRef<THREE.Mesh>(null);
   const bodyRef = useRef<any>(null);
+  const auraRef = useRef<THREE.Mesh>(null);
   const { camera } = useThree();
   
   const {
+    playerClass,
     updatePlayerPosition,
     updatePlayerRotation,
     setMoving,
     setAnimation,
     currentAnimation,
+    auraActive,
+    auraColor,
   } = useGameStore();
 
   const [movement, setMovement] = useState({
@@ -147,6 +151,12 @@ function Player() {
       meshRef.current.rotation.y = angle;
       updatePlayerRotation(angle);
     }
+    
+    // Animate aura
+    if (auraRef.current) {
+      auraRef.current.rotation.y += delta * 2;
+      auraRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 3) * 0.1);
+    }
 
     // Update camera to follow player
     camera.position.lerp(
@@ -158,13 +168,28 @@ function Player() {
     updatePlayerPosition([position.x, position.y, position.z]);
   });
 
+  const getClassColor = () => {
+    const colors: Record<string, string> = {
+      'swordsman': '#ff4444',
+      'fire-mage': '#ff6600',
+      'water-mage': '#00aaff',
+      'light-mage': '#ffff00',
+      'dark-mage': '#9900ff',
+      'earth-mage': '#885522',
+      'archer': '#00ff00',
+      'healer': '#ff88ff',
+      'summoner': '#00ffff',
+    };
+    return colors[playerClass] || '#4080ff';
+  };
+
   return (
     <RigidBody ref={bodyRef} position={[0, 2, 0]} colliders={false}>
       <CuboidCollider args={[0.5, 1, 0.5]} />
       <mesh ref={meshRef} castShadow>
         {/* Body */}
         <boxGeometry args={[1, 2, 0.8]} />
-        <meshStandardMaterial color="#4080ff" />
+        <meshStandardMaterial color={getClassColor()} />
         
         {/* Head */}
         <mesh position={[0, 1.3, 0]} castShadow>
@@ -175,11 +200,11 @@ function Player() {
         {/* Arms */}
         <mesh position={[-0.7, 0.3, 0]} castShadow>
           <boxGeometry args={[0.3, 1, 0.3]} />
-          <meshStandardMaterial color="#4080ff" />
+          <meshStandardMaterial color={getClassColor()} />
         </mesh>
         <mesh position={[0.7, 0.3, 0]} castShadow>
           <boxGeometry args={[0.3, 1, 0.3]} />
-          <meshStandardMaterial color="#4080ff" />
+          <meshStandardMaterial color={getClassColor()} />
         </mesh>
         
         {/* Legs */}
@@ -191,7 +216,24 @@ function Player() {
           <boxGeometry args={[0.3, 1.2, 0.3]} />
           <meshStandardMaterial color="#303060" />
         </mesh>
+        
+        {/* Mana Aura Effect */}
+        {auraActive && (
+          <mesh ref={auraRef} position={[0, 0, 0]}>
+            <torusGeometry args={[1.5, 0.1, 16, 100]} />
+            <meshStandardMaterial
+              color={auraColor}
+              emissive={auraColor}
+              emissiveIntensity={2}
+              transparent
+              opacity={0.6}
+            />
+          </mesh>
+        )}
       </mesh>
+      
+      {/* Class-specific glow */}
+      <pointLight color={getClassColor()} intensity={auraActive ? 3 : 1} distance={10} />
     </RigidBody>
   );
 }
