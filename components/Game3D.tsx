@@ -38,7 +38,7 @@ function EnemyMesh({ enemy }: { enemy: any }) {
         castShadow
       >
         <boxGeometry args={[1, 1.5, 1]} />
-        <meshStandardMaterial color={enemyColor} />
+        <meshToonMaterial color={enemyColor} />
         
         {/* Enemy name tag */}
         <mesh position={[0, 1.2, 0]}>
@@ -240,37 +240,63 @@ function Player() {
   };
 
   return (
-    <RigidBody ref={bodyRef} position={[0, 2, 0]} colliders={false}>
+    <RigidBody ref={bodyRef} position={[0, 5, 0]} colliders={false} lockRotations>
       <CuboidCollider args={[0.5, 1, 0.5]} />
       <mesh ref={meshRef} castShadow>
-        {/* Body */}
-        <boxGeometry args={[1, 2, 0.8]} />
-        <meshStandardMaterial color={getClassColor()} />
+        {/* Anime-style Body */}
+        <boxGeometry args={[0.8, 1.8, 0.6]} />
+        <meshToonMaterial color={getClassColor()} />
         
-        {/* Head */}
+        {/* Anime-style Head */}
         <mesh position={[0, 1.3, 0]} castShadow>
-          <sphereGeometry args={[0.4, 16, 16]} />
-          <meshStandardMaterial color="#ffcc80" />
+          <sphereGeometry args={[0.5, 16, 16]} />
+          <meshToonMaterial color="#ffcc80" />
+          
+          {/* Anime Eyes */}
+          <mesh position={[-0.15, 0.1, 0.4]}>
+            <circleGeometry args={[0.08, 16]} />
+            <meshBasicMaterial color="#000000" />
+          </mesh>
+          <mesh position={[0.15, 0.1, 0.4]}>
+            <circleGeometry args={[0.08, 16]} />
+            <meshBasicMaterial color="#000000" />
+          </mesh>
+          
+          {/* Anime Highlights in eyes */}
+          <mesh position={[-0.15, 0.12, 0.41]}>
+            <circleGeometry args={[0.03, 8]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+          <mesh position={[0.15, 0.12, 0.41]}>
+            <circleGeometry args={[0.03, 8]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+          
+          {/* Anime Mouth */}
+          <mesh position={[0, -0.05, 0.4]} rotation={[0, 0, Math.PI]}>
+            <ringGeometry args={[0.05, 0.08, 16, 1, 0, Math.PI]} />
+            <meshBasicMaterial color="#000000" />
+          </mesh>
         </mesh>
         
-        {/* Arms */}
-        <mesh position={[-0.7, 0.3, 0]} castShadow>
-          <boxGeometry args={[0.3, 1, 0.3]} />
-          <meshStandardMaterial color={getClassColor()} />
+        {/* Anime Arms */}
+        <mesh position={[-0.6, 0.3, 0]} castShadow>
+          <boxGeometry args={[0.25, 0.9, 0.25]} />
+          <meshToonMaterial color={getClassColor()} />
         </mesh>
-        <mesh position={[0.7, 0.3, 0]} castShadow>
-          <boxGeometry args={[0.3, 1, 0.3]} />
-          <meshStandardMaterial color={getClassColor()} />
+        <mesh position={[0.6, 0.3, 0]} castShadow>
+          <boxGeometry args={[0.25, 0.9, 0.25]} />
+          <meshToonMaterial color={getClassColor()} />
         </mesh>
         
-        {/* Legs */}
-        <mesh position={[-0.3, -1.3, 0]} castShadow>
-          <boxGeometry args={[0.3, 1.2, 0.3]} />
-          <meshStandardMaterial color="#303060" />
+        {/* Anime Legs */}
+        <mesh position={[-0.25, -1.3, 0]} castShadow>
+          <boxGeometry args={[0.25, 1.2, 0.25]} />
+          <meshToonMaterial color="#303060" />
         </mesh>
-        <mesh position={[0.3, -1.3, 0]} castShadow>
-          <boxGeometry args={[0.3, 1.2, 0.3]} />
-          <meshStandardMaterial color="#303060" />
+        <mesh position={[0.25, -1.3, 0]} castShadow>
+          <boxGeometry args={[0.25, 1.2, 0.25]} />
+          <meshToonMaterial color="#303060" />
         </mesh>
         
         {/* Mana Aura Effect */}
@@ -349,11 +375,19 @@ function Terrain() {
   
   return (
     <>
-      {/* Ground */}
+      {/* Anime-style Ground with grass pattern */}
       <RigidBody type="fixed" colliders="cuboid">
-        <mesh receiveShadow position={[0, -0.5, 0]}>
-          <boxGeometry args={[200, 1, 200]} />
-          <meshStandardMaterial color="#3a8a3a" />
+        <mesh receiveShadow position={[0, 0, 0]}>
+          <boxGeometry args={[300, 1, 300]} />
+          <meshToonMaterial color="#4CAF50" />
+        </mesh>
+      </RigidBody>
+      
+      {/* Underground support */}
+      <RigidBody type="fixed" colliders="cuboid">
+        <mesh position={[0, -5, 0]}>
+          <boxGeometry args={[300, 10, 300]} />
+          <meshToonMaterial color="#8B4513" />
         </mesh>
       </RigidBody>
       
@@ -370,11 +404,11 @@ function Terrain() {
               <RigidBody type="fixed" colliders="cuboid">
                 <mesh castShadow position={[0, 2, 0]}>
                   <cylinderGeometry args={[0.3, 0.4, 4]} />
-                  <meshStandardMaterial color="#654321" />
+                  <meshToonMaterial color="#654321" />
                 </mesh>
                 <mesh castShadow position={[0, 5, 0]}>
                   <coneGeometry args={[2, 4, 8]} />
-                  <meshStandardMaterial color="#228B22" />
+                  <meshToonMaterial color="#228B22" />
                 </mesh>
               </RigidBody>
             </group>
@@ -385,7 +419,7 @@ function Terrain() {
             <RigidBody key={`rock-${i}`} type="fixed" position={[x, 0.5, z]}>
               <mesh castShadow>
                 <dodecahedronGeometry args={[0.8]} />
-                <meshStandardMaterial color="#808080" />
+                <meshToonMaterial color="#808080" />
               </mesh>
             </RigidBody>
           );

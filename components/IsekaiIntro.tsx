@@ -74,27 +74,41 @@ export default function IsekaiIntro() {
         </h2>
         
         <div style={{
-          maxWidth: '700px',
+          maxWidth: '800px',
           fontSize: '18px',
           lineHeight: '1.8',
           marginBottom: '40px',
-          background: 'rgba(0, 0, 0, 0.6)',
-          padding: '30px',
+          background: 'rgba(0, 0, 0, 0.8)',
+          padding: '40px',
           borderRadius: '15px',
-          border: '2px solid rgba(255, 215, 0, 0.3)',
+          border: '3px solid rgba(255, 215, 0, 0.5)',
+          boxShadow: '0 0 30px rgba(255, 215, 0, 0.3)',
         }}>
-          <p style={{ marginBottom: '20px' }}>
-            In a world where magic flows like rivers and legendary beasts roam free...
+          <p style={{ marginBottom: '20px', fontSize: '20px', color: '#ffaa00' }}>
+            ✨ <strong>The Summoning</strong> ✨
           </p>
           <p style={{ marginBottom: '20px' }}>
-            You have been given a second chance at life - reborn in a fantasy realm
-            filled with adventure, danger, and endless possibilities.
+            You were living an ordinary life until a mysterious magic circle appeared beneath your feet. 
+            In a blinding flash of light, you found yourself in <span style={{color: '#ffd700', fontWeight: 'bold'}}>Aetheria</span> - 
+            a vibrant fantasy world of magic, monsters, and endless adventures!
           </p>
           <p style={{ marginBottom: '20px' }}>
-            Choose your path. Master powerful abilities. Tame mythical companions.
+            A mystical voice echoes: <em style={{color: '#00ffff'}}>"Welcome, Traveler. You have been chosen to become a hero in this world. 
+            Choose your destiny wisely..."</em>
           </p>
-          <p style={{ fontWeight: 'bold', color: '#ffd700', fontSize: '20px' }}>
-            Your isekai adventure begins now!
+          <p style={{ marginBottom: '20px', color: '#ff69b4' }}>
+            <strong>🌟 Your Isekai Journey Awaits:</strong>
+          </p>
+          <ul style={{ textAlign: 'left', paddingLeft: '40px', marginBottom: '20px' }}>
+            <li>⚔️ <strong>9 Legendary Classes</strong> - Swordsman, Fire/Water/Light/Dark/Earth Mages, Archer, Healer, Summoner</li>
+            <li>🐾 <strong>50+ Mythical Pets</strong> - Dragons, phoenixes, unicorns, and more!</li>
+            <li>🗺️ <strong>10 Massive Zones</strong> - From peaceful plains to demon kingdoms</li>
+            <li>📜 <strong>3,000,000+ Quests</strong> - Procedurally generated adventures</li>
+            <li>🏆 <strong>200+ Achievements</strong> - Prove you're the ultimate hero</li>
+            <li>⏰ <strong>2000+ Hours</strong> of epic gameplay!</li>
+          </ul>
+          <p style={{ fontWeight: 'bold', color: '#ffd700', fontSize: '22px', marginTop: '30px' }}>
+            🌸 Will you save Aetheria from the Demon King? 🌸
           </p>
         </div>
 
