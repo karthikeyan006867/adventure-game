@@ -70,6 +70,31 @@ export interface Quest {
   maxProgress: number;
 }
 
+export interface Enemy {
+  id: string;
+  name: string;
+  level: number;
+  health: number;
+  maxHealth: number;
+  attack: number;
+  defense: number;
+  xpReward: number;
+  goldReward: number;
+  position: [number, number, number];
+  type: string;
+  aggressive: boolean;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  requirement: number;
+  progress: number;
+  unlocked: boolean;
+  reward: { xp: number; gold: number };
+}
+
 interface GameState {
   // Player
   playerName: string;
@@ -105,6 +130,24 @@ interface GameState {
   // Quests
   quests: Quest[];
   
+  // Combat & Enemies
+  enemies: Enemy[];
+  inCombat: boolean;
+  targetEnemy: Enemy | null;
+  enemiesDefeated: number;
+  
+  // Achievements
+  achievements: Achievement[];
+  
+  // Tutorial
+  tutorialStep: number;
+  tutorialCompleted: boolean;
+  
+  // Stats tracking
+  questsCompleted: number;
+  dungeonsCleared: number;
+  totalPlayTime: number;
+  
   // Actions
   setPlayerClass: (playerClass: PlayerClass) => void;
   setPlayerName: (name: string) => void;
@@ -127,6 +170,11 @@ interface GameState {
   completeQuest: (questId: string) => void;
   healPlayer: (amount: number) => void;
   takeDamage: (amount: number) => void;
+  attackEnemy: (enemyId: string) => void;
+  spawnEnemies: (count: number) => void;
+  defeatEnemy: (enemyId: string) => void;
+  checkAchievements: () => void;
+  nextTutorialStep: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -169,7 +217,25 @@ export const useGameStore = create<GameState>((set, get) => ({
   pets: [],
   activePet: null,
   
-  // Initial World
+  // Initial 
+  
+  // Initial Combat
+  enemies: [],
+  inCombat: false,
+  targetEnemy: null,
+  enemiesDefeated: 0,
+  
+  // Initial Achievements
+  achievements: [],
+  
+  // Initial Tutorial
+  tutorialStep: 0,
+  tutorialCompleted: false,
+  
+  // Initial Stats
+  questsCompleted: 0,
+  dungeonsCleared: 0,
+  totalPlayTime: 0,
   currentZone: 'Starter Plains',
   discoveredZones: ['Starter Plains'],
   
@@ -293,29 +359,46 @@ export const useGameStore = create<GameState>((set, get) => ({
   
   updateQuestProgress: (questId: string, progress: number) => {
     const state = get();
-    const updatedQuests = state.quests.map(q => {
-      if (q.id === questId) {
-        const newProgress = Math.min(q.maxProgress, progress);
-        const completed = newProgress >= q.maxProgress;
-        return { ...q, progress: newProgress, completed };
+    const updatedQuests = state.quests.map(quest => {
+      if (quest.id === questId) {
+        const newProgress = Math.min(quest.maxProgress, progress);
+        const completed = newProgress >= quest.maxProgress;
+        return { ...quest, progress: newProgress, completed };
       }
-      return q;
+      return quest;
     });
-    set({ quests: updatedQuests });
+    
+    const newlyCompleted = updatedQuests.find(q => q.id === questId && q.completed && !state.quests.find(oq => oq.id === questId)?.completed);
+    
+    if (newlyCompleted) {
+      set({
+        quests: updatedQuests,
+        questsCompleted: state.questsCompleted + 1,
+      });
+      
+      state.checkAchievements();
+    } else {
+      set({ quests: updatedQuests });
+    }
   },
   
   completeQuest: (questId: string) => {
     const state = get();
     const quest = state.quests.find(q => q.id === questId);
+    
     if (quest && !quest.completed) {
-      state.gainXP(quest.rewards.xp);
-      state.addGold(quest.rewards.gold);
-      quest.rewards.items.forEach(item => state.addItem(item));
-      
       const updatedQuests = state.quests.map(q =>
         q.id === questId ? { ...q, completed: true, progress: q.maxProgress } : q
       );
-      set({ quests: updatedQuests });
+      
+      set({
+        quests: updatedQuests,
+        questsCompleted: state.questsCompleted + 1,
+        playerXP: state.playerXP + quest.rewards.xp,
+        gold: state.gold + quest.rewards.gold,
+      });
+      
+      state.checkAchievements();
     }
   },
   
@@ -334,6 +417,114 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       playerStats: { ...state.playerStats, health: newHealth }
     });
+    
+    // Auto heal if health is 0
+    if (newHealth === 0) {
+      setTimeout(() => {
+        state.healPlayer(state.playerStats.maxHealth);
+        set({ playerPosition: [0, 2, 0] }); // Respawn at start
+      }, 2000);
+    }
+  },
+  
+  attackEnemy: (enemyId: string) => {
+    const state = get();
+    const enemy = state.enemies.find(e => e.id === enemyId);
+    if (enemy) {
+      const damage = state.playerStats.attack;
+      const newHealth = Math.max(0, enemy.health - damage);
+      
+      if (newHealth === 0) {
+        state.defeatEnemy(enemyId);
+      } else {
+        const updatedEnemies = state.enemies.map(e =>
+          e.id === enemyId ? { ...e, health: newHealth } : e
+        );
+        set({ enemies: updatedEnemies });
+        
+        // Enemy counterattack
+        setTimeout(() => {
+          state.takeDamage(enemy.attack);
+        }, 500);
+      }
+    }
+  },
+  
+  spawnEnemies: (count: number) => {
+    const state = get();
+    const { spawnEnemy } = require('./contentGeneration');
+    const newEnemies = [];
+    
+    for (let i = 0; i < count; i++) {
+      newEnemies.push(spawnEnemy(state.currentZone, state.playerLevel));
+    }
+    
+    set({ enemies: [...state.enemies, ...newEnemies] });
+  },
+  
+  defeatEnemy: (enemyId: string) => {
+    const state = get();
+    const enemy = state.enemies.find(e => e.id === enemyId);
+    
+    if (enemy) {
+      state.gainXP(enemy.xpReward);
+      state.addGold(enemy.goldReward);
+      
+      const updatedEnemies = state.enemies.filter(e => e.id !== enemyId);
+      set({ 
+        enemies: updatedEnemies,
+        enemiesDefeated: state.enemiesDefeated + 1,
+      });
+      
+      state.checkAchievements();
+    }
+  },
+  
+  checkAchievements: () => {
+    const state = get();
+    const updatedAchievements = state.achievements.map(achievement => {
+      if (achievement.unlocked) return achievement;
+      
+      let progress = 0;
+      
+      // Check different achievement types
+      if (achievement.id.includes('level')) {
+        progress = state.playerLevel;
+      } else if (achievement.id.includes('pet')) {
+        progress = state.pets.length;
+      } else if (achievement.id.includes('quest')) {
+        progress = state.questsCompleted;
+      } else if (achievement.id.includes('dungeon')) {
+        progress = state.dungeonsCleared;
+      } else if (achievement.id.includes('monster')) {
+        progress = state.enemiesDefeated;
+      } else if (achievement.id.includes('wealthy')) {
+        progress = state.gold;
+      }
+      
+      const unlocked = progress >= achievement.requirement;
+      
+      if (unlocked && !achievement.unlocked) {
+        // Grant achievement rewards
+        state.gainXP(achievement.reward.xp);
+        state.addGold(achievement.reward.gold);
+      }
+      
+      return { ...achievement, progress, unlocked };
+    });
+    
+    set({ achievements: updatedAchievements });
+  },
+  
+  nextTutorialStep: () => {
+    const state = get();
+    const { TutorialSteps } = require('./contentGeneration');
+    
+    if (state.tutorialStep < TutorialSteps.length - 1) {
+      set({ tutorialStep: state.tutorialStep + 1 });
+    } else {
+      set({ tutorialCompleted: true });
+    }
   },
   
   useSkill: (skillId: string) => {
@@ -346,6 +537,34 @@ export const useGameStore = create<GameState>((set, get) => ({
       const updatedSkills = state.skills.map(s => 
         s.id === skillId ? { ...s, currentCooldown: s.cooldown } : s
       );
+      
+      // Apply skill effects
+      if (skill.healing) {
+        state.healPlayer(skill.healing);
+      }
+      
+      // Damage nearby enemies if skill has damage
+      if (skill.damage) {
+        const playerPos = state.playerPosition;
+        state.enemies.forEach(enemy => {
+          const distance = Math.sqrt(
+            Math.pow(enemy.position[0] - playerPos[0], 2) +
+            Math.pow(enemy.position[2] - playerPos[2], 2)
+          );
+          
+          if (distance < 10) {
+            const newHealth = Math.max(0, enemy.health - skill.damage!);
+            if (newHealth === 0) {
+              state.defeatEnemy(enemy.id);
+            } else {
+              const updatedEnemies = state.enemies.map(e =>
+                e.id === enemy.id ? { ...e, health: newHealth } : e
+              );
+              set({ enemies: updatedEnemies });
+            }
+          }
+        });
+      }
       
       set({
         playerStats: { ...state.playerStats, mana: newMana },
@@ -370,6 +589,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...skill,
       currentCooldown: Math.max(0, skill.currentCooldown - delta),
     }));
-    set({ skills: updatedSkills });
+    
+    // Also regenerate mana
+    const newMana = Math.min(
+      state.playerStats.maxMana,
+      state.playerStats.mana + delta * 2
+    );
+    
+    set({ 
+      skills: updatedSkills,
+      playerStats: { ...state.playerStats, mana: newMana },
+      totalPlayTime: state.totalPlayTime + delta,
+    });
   },
 }));

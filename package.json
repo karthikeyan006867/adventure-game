@@ -1,7 +1,7 @@
 {
-  "name": "epic-3d-adventure",
-  "version": "1.0.0",
-  "description": "The world's best 3D adventure game with pets, leveling, and endless possibilities",
+  "name": "ultimate-isekai-adventure",
+  "version": "2.0.0",
+  "description": "The ultimate isekai game with 2000+ hours of gameplay, 3M+ possible stories, combat, dungeons, and endless adventure",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

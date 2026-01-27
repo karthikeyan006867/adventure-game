@@ -7,6 +7,62 @@ import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/gameStore';
 
+// Enemy Component
+function EnemyMesh({ enemy }: { enemy: any }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const { playerPosition, attackEnemy } = useGameStore();
+  
+  useFrame(() => {
+    if (!meshRef.current || enemy.health <= 0) return;
+    
+    // Face player if aggressive
+    if (enemy.aggressive) {
+      const dx = playerPosition[0] - enemy.position[0];
+      const dz = playerPosition[2] - enemy.position[2];
+      const angle = Math.atan2(dx, dz);
+      meshRef.current.rotation.y = angle;
+    }
+    
+    // Bobbing animation
+    meshRef.current.position.y = enemy.position[1] + Math.sin(Date.now() * 0.003) * 0.1;
+  });
+  
+  const healthPercent = (enemy.health / enemy.maxHealth) * 100;
+  const enemyColor = enemy.aggressive ? '#ff4444' : '#ffaa00';
+  
+  return (
+    <group position={enemy.position}>
+      <mesh
+        ref={meshRef}
+        onClick={() => attackEnemy(enemy.id)}
+        castShadow
+      >
+        <boxGeometry args={[1, 1.5, 1]} />
+        <meshStandardMaterial color={enemyColor} />
+        
+        {/* Enemy name tag */}
+        <mesh position={[0, 1.2, 0]}>
+          <planeGeometry args={[2, 0.3]} />
+          <meshBasicMaterial color="#000000" opacity={0.7} transparent />
+        </mesh>
+      </mesh>
+      
+      {/* Health bar */}
+      <mesh position={[0, 2, 0]}>
+        <planeGeometry args={[1, 0.1]} />
+        <meshBasicMaterial color="#ff0000" />
+      </mesh>
+      <mesh position={[0, 2, 0.01]}>
+        <planeGeometry args={[healthPercent / 100, 0.1]} />
+        <meshBasicMaterial color="#00ff00" />
+      </mesh>
+      
+      {/* Level indicator */}
+      <pointLight color={enemyColor} intensity={0.5} distance={5} />
+    </group>
+  );
+}
+
 // Player Character Component
 function Player() {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -389,6 +445,15 @@ function EnvironmentEffects() {
 }
 
 export default function Game3D() {
+  const { enemies, spawnEnemies } = useGameStore();
+  
+  // Spawn initial enemies
+  useEffect(() => {
+    if (enemies.length === 0) {
+      spawnEnemies(20);
+    }
+  }, []);
+  
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <Canvas shadows camera={{ position: [0, 10, 15], fov: 60 }}>
@@ -408,6 +473,11 @@ export default function Game3D() {
           <Player />
           <PetCompanion />
           <Terrain />
+          
+          {/* Render all enemies */}
+          {enemies.map(enemy => (
+            <EnemyMesh key={enemy.id} enemy={enemy} />
+          ))}
         </Physics>
         
         <EnvironmentEffects />

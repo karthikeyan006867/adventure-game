@@ -20,30 +20,73 @@ export default function GameHUD() {
     skills,
     isMoving,
     currentAnimation,
+    enemies,
+    enemiesDefeated,
+    achievements,
+    tutorialStep,
+    tutorialCompleted,
+    questsCompleted,
+    totalPlayTime,
     gainXP,
     addPet,
     setActivePet,
     discoverZone,
     useSkill,
     updateSkillCooldowns,
+    addQuest,
+    spawnEnemies,
+    checkAchievements,
+    nextTutorialStep,
   } = useGameStore();
 
   const [showPetMenu, setShowPetMenu] = useState(false);
   const [showQuestLog, setShowQuestLog] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  
+  // Show notification helper
+  const showNotification = (message: string) => {
+    setNotification(message);
+    setTimeout(() => setNotification(null), 3000);
+  };
+  
+  // Load achievements and tutorial on mount
+  useEffect(() => {
+    const { Achievements } = require('@/store/contentGeneration');
+    if (achievements.length === 0) {
+      useGameStore.setState({ achievements: Achievements });
+    }
+  }, []);
 
-  // Auto XP gain when moving (exploration)
+  // Auto XP gain when moving, quest generation, and enemy spawning
   useEffect(() => {
     const interval = setInterval(() => {
       if (isMoving) {
-        gainXP(1);
+        gainXP(2);
       }
-      // Update skill cooldowns
+      // Update skill cooldowns and mana regen
       updateSkillCooldowns(1);
+      
+      // Generate quests periodically
+      if (quests.length < 10 && Math.random() > 0.95) {
+        const { generateQuest } = require('@/store/contentGeneration');
+        const newQuest = generateQuest(playerLevel, quests.length + 1);
+        addQuest(newQuest);
+        showNotification(`New Quest: ${newQuest.title}`);
+      }
+      
+      // Spawn more enemies if needed
+      if (enemies.length < 15 && Math.random() > 0.9) {
+        spawnEnemies(5);
+      }
+      
+      // Check achievements
+      checkAchievements();
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isMoving, gainXP, updateSkillCooldowns]);
+  }, [isMoving, quests.length, enemies.length, playerLevel]);
   
   // Skill hotkeys
   useEffect(() => {
@@ -64,12 +107,6 @@ export default function GameHUD() {
     window.addEventListener('keypress', handleKeyPress);
     return () => window.removeEventListener('keypress', handleKeyPress);
   }, [skills, playerStats.mana, useSkill]);
-
-  // Show notification
-  const showNotification = (message: string) => {
-    setNotification(message);
-    setTimeout(() => setNotification(null), 3000);
-  };
 
   // Add starter pet if none
   useEffect(() => {
@@ -99,7 +136,9 @@ export default function GameHUD() {
       {/* Top Left - Player Stats */}
       <div style={{
         position: 'absolute',
-        top: '20px',85)',
+        top: '20px',
+        left: '20px',
+        background: 'rgba(0, 0, 0, 0.85)',
         padding: '15px',
         borderRadius: '10px',
         color: 'white',
@@ -112,9 +151,7 @@ export default function GameHUD() {
         </h2>
         <div style={{ fontSize: '14px', color: '#ffaa00', marginBottom: '10px' }}>
           Lv.{playerLevel} {playerClass.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-        </divstyle={{ margin: '0 0 10px 0', fontSize: '24px', color: '#ffd700' }}>
-          Level {playerLevel} Adventurer
-        </h2>
+        </div>
         
         {/* Health Bar */}
         <div style={{ marginBottom: '8px' }}>
@@ -185,13 +222,20 @@ export default function GameHUD() {
           💰 Gold: {gold}
         </div>
 
-        {/* Stats */}
-        <div style={{ marginTop: '10px', fontSize: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+        {/* Stats Display */}
+        <div style={{ fontSize: '10px', marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px' }}>
           <div>⚔️ ATK: {playerStats.attack}</div>
           <div>🛡️ DEF: {playerStats.defense}</div>
           <div>🏃 SPD: {playerStats.speed}</div>
           <div>🔮 MAG: {playerStats.magic}</div>
           <div>🍀 LCK: {playerStats.luck}</div>
+        </div>
+        
+        {/* Play Stats */}
+        <div style={{ fontSize: '10px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,215,0,0.3)' }}>
+          <div>🗡️ Enemies: {enemiesDefeated}</div>
+          <div>✅ Quests: {questsCompleted}</div>
+          <div>⏱️ Time: {Math.floor(totalPlayTime / 60)}m</div>
         </div>
       </div>
 
@@ -348,7 +392,7 @@ export default function GameHUD() {
           <div>Space - Jump</div>
           <div>Mouse - Look Around</div>
         </div>
-        <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+        <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setShowPetMenu(!showPetMenu)}
             style={{
@@ -358,7 +402,7 @@ export default function GameHUD() {
               borderRadius: '5px',
               color: 'white',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: '11px',
             }}
           >
             🐾 Pets ({pets.length})
@@ -372,10 +416,38 @@ export default function GameHUD() {
               borderRadius: '5px',
               color: 'white',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: '11px',
             }}
           >
-            📜 Quests
+            📜 Quests ({quests.filter(q => !q.completed).length})
+          </button>
+          <button
+            onClick={() => setShowAchievements(!showAchievements)}
+            style={{
+              padding: '8px 15px',
+              background: '#FF9800',
+              border: 'none',
+              borderRadius: '5px',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '11px',
+            }}
+          >
+            🏆 Achievements
+          </button>
+          <button
+            onClick={() => setShowStats(!showStats)}
+            style={{
+              padding: '8px 15px',
+              background: '#9C27B0',
+              border: 'none',
+              borderRadius: '5px',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '11px',
+            }}
+          >
+            📊 Stats
           </button>
         </div>
       </div>
@@ -475,14 +547,15 @@ export default function GameHUD() {
           padding: '30px',
           borderRadius: '15px',
           color: 'white',
-          maxWidth: '600px',
+          maxWidth: '700px',
           maxHeight: '70vh',
           overflow: 'auto',
           pointerEvents: 'auto',
+          border: '2px solid #2196F3',
         }}>
-          <h2 style={{ margin: '0 0 20px 0' }}>📜 Quest Log</h2>
+          <h2 style={{ margin: '0 0 20px 0' }}>📜 Quest Log ({quests.length} Total)</h2>
           {quests.length === 0 ? (
-            <p style={{ opacity: 0.7 }}>No active quests. Explore to discover new adventures!</p>
+            <p style={{ opacity: 0.7 }}>Quests will appear automatically as you explore!</p>
           ) : (
             quests.map(quest => (
               <div
@@ -492,9 +565,20 @@ export default function GameHUD() {
                   background: quest.completed ? '#2e7d32' : '#1a237e',
                   borderRadius: '10px',
                   marginBottom: '10px',
+                  border: quest.type === 'epic' ? '2px solid gold' : '1px solid rgba(255,255,255,0.2)',
                 }}
               >
-                <h3 style={{ margin: '0 0 5px 0' }}>{quest.title}</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: '0 0 5px 0' }}>{quest.title}</h3>
+                  <span style={{ 
+                    fontSize: '10px', 
+                    padding: '2px 8px', 
+                    background: quest.type === 'epic' ? '#ff6600' : quest.type === 'main' ? '#2196F3' : '#4CAF50',
+                    borderRadius: '10px',
+                  }}>
+                    {quest.type.toUpperCase()}
+                  </span>
+                </div>
                 <p style={{ fontSize: '12px', margin: '5px 0', opacity: 0.9 }}>
                   {quest.description}
                 </p>
@@ -511,12 +595,14 @@ export default function GameHUD() {
                     <div style={{ 
                       width: `${(quest.progress / quest.maxProgress) * 100}%`, 
                       height: '100%', 
-                      background: '#4CAF50' 
+                      background: quest.completed ? '#4CAF50' : '#ffd700',
+                      transition: 'width 0.3s',
                     }} />
                   </div>
                 </div>
                 <div style={{ fontSize: '11px', marginTop: '8px', color: '#ffd700' }}>
                   Rewards: {quest.rewards.xp} XP, {quest.rewards.gold} Gold
+                  {quest.rewards.items.length > 0 && `, +${quest.rewards.items.length} items`}
                 </div>
               </div>
             ))
@@ -535,6 +621,172 @@ export default function GameHUD() {
             }}
           >
             Close
+          </button>
+        </div>
+      )}
+
+      {/* Achievements Modal */}
+      {showAchievements && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(0, 0, 0, 0.95)',
+          padding: '30px',
+          borderRadius: '15px',
+          color: 'white',
+          maxWidth: '700px',
+          maxHeight: '70vh',
+          overflow: 'auto',
+          pointerEvents: 'auto',
+          border: '2px solid #FF9800',
+        }}>
+          <h2 style={{ margin: '0 0 20px 0' }}>🏆 Achievements ({achievements.filter(a => a.unlocked).length}/{achievements.length})</h2>
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {achievements.map(achievement => (
+              <div
+                key={achievement.id}
+                style={{
+                  padding: '15px',
+                  background: achievement.unlocked ? '#2e7d32' : '#424242',
+                  borderRadius: '10px',
+                  opacity: achievement.unlocked ? 1 : 0.6,
+                  border: achievement.unlocked ? '2px solid gold' : '1px solid #666',
+                }}
+              >
+                <h3 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>
+                  {achievement.unlocked ? '✅' : '🔒'} {achievement.name}
+                </h3>
+                <p style={{ fontSize: '12px', margin: '5px 0', opacity: 0.9 }}>
+                  {achievement.description}
+                </p>
+                <div style={{ fontSize: '11px', marginTop: '8px' }}>
+                  Progress: {achievement.progress}/{achievement.requirement}
+                  <div style={{ 
+                    width: '100%', 
+                    height: '6px', 
+                    background: '#333', 
+                    borderRadius: '3px', 
+                    marginTop: '5px',
+                    overflow: 'hidden' 
+                  }}>
+                    <div style={{ 
+                      width: `${Math.min(100, (achievement.progress / achievement.requirement) * 100)}%`, 
+                      height: '100%', 
+                      background: achievement.unlocked ? '#4CAF50' : '#FF9800',
+                    }} />
+                  </div>
+                </div>
+                {achievement.unlocked && (
+                  <div style={{ fontSize: '10px', marginTop: '5px', color: '#ffd700' }}>
+                    Reward: {achievement.reward.xp} XP, {achievement.reward.gold} Gold
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowAchievements(false)}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              background: '#f44336',
+              border: 'none',
+              borderRadius: '5px',
+              color: 'white',
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      )}
+
+      {/* Stats Modal */}
+      {showStats && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(0, 0, 0, 0.95)',
+          padding: '30px',
+          borderRadius: '15px',
+          color: 'white',
+          maxWidth: '500px',
+          pointerEvents: 'auto',
+          border: '2px solid #9C27B0',
+        }}>
+          <h2 style={{ margin: '0 0 20px 0' }}>📊 Player Statistics</h2>
+          <div style={{ fontSize: '14px', lineHeight: '2' }}>
+            <div><strong>Total Play Time:</strong> {Math.floor(totalPlayTime / 60)} minutes</div>
+            <div><strong>Current Level:</strong> {playerLevel}</div>
+            <div><strong>Total XP Earned:</strong> {playerXP + (playerLevel * playerXPToNext)}</div>
+            <div><strong>Enemies Defeated:</strong> {enemiesDefeated}</div>
+            <div><strong>Quests Completed:</strong> {questsCompleted}</div>
+            <div><strong>Active Quests:</strong> {quests.filter(q => !q.completed).length}</div>
+            <div><strong>Total Gold:</strong> {gold}</div>
+            <div><strong>Pets Collected:</strong> {pets.length}</div>
+            <div><strong>Current Zone:</strong> {currentZone}</div>
+            <div><strong>Class:</strong> {playerClass}</div>
+          </div>
+          <button
+            onClick={() => setShowStats(false)}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              background: '#f44336',
+              border: 'none',
+              borderRadius: '5px',
+              color: 'white',
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      )}
+
+      {/* Tutorial Overlay */}
+      {!tutorialCompleted && tutorialStep < 8 && (
+        <div style={{
+          position: 'absolute',
+          bottom: '120px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0, 0, 0, 0.9)',
+          padding: '20px 30px',
+          borderRadius: '10px',
+          color: 'white',
+          maxWidth: '500px',
+          pointerEvents: 'auto',
+          border: '2px solid #4CAF50',
+        }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#4CAF50' }}>
+            📚 Tutorial Step {tutorialStep + 1}/8
+          </h3>
+          <p style={{ fontSize: '14px', margin: '0 0 15px 0' }}>
+            {(() => {
+              const { TutorialSteps } = require('@/store/contentGeneration');
+              return TutorialSteps[tutorialStep]?.description || 'Explore and discover!';
+            })()}
+          </p>
+          <button
+            onClick={() => nextTutorialStep()}
+            style={{
+              padding: '8px 20px',
+              background: '#4CAF50',
+              border: 'none',
+              borderRadius: '5px',
+              color: 'white',
+              cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            Next
           </button>
         </div>
       )}
