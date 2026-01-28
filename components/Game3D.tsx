@@ -6,6 +6,7 @@ import { OrbitControls, Sky, Stars, Cloud, Environment } from '@react-three/drei
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/gameStore';
+import MobileControls from './MobileControls';
 
 // Enemy Component
 function EnemyMesh({ enemy }: { enemy: any }) {
@@ -89,8 +90,11 @@ function Player() {
     jump: false,
   });
 
-  const speed = 5;
-  const jumpForce = 5;
+  const [touchMovement, setTouchMovement] = useState({ x: 0, y: 0 });
+  const [isTouching, setIsTouching] = useState(false);
+
+  const speed = 6;
+  const jumpForce = 7;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -157,47 +161,64 @@ function Player() {
     const position = bodyRef.current.translation();
     
     // Check if on ground (important for jumping)
-    const onGround = Math.abs(velocity.y) < 0.5 && position.y < 4;
+    const onGround = position.y < 3 && Math.abs(velocity.y) < 1;
     
     let moveX = 0;
     let moveZ = 0;
     let isMoving = false;
 
-    // Calculate movement direction
+    // Keyboard movement
     if (movement.forward) {
-      moveZ = -1;
+      moveZ -= 1;
       isMoving = true;
     }
     if (movement.backward) {
-      moveZ = 1;
+      moveZ += 1;
       isMoving = true;
     }
     if (movement.left) {
-      moveX = -1;
+      moveX -= 1;
       isMoving = true;
     }
     if (movement.right) {
-      moveX = 1;
+      moveX += 1;
+      isMoving = true;
+    }
+
+    // Mobile touch movement
+    if (isTouching && (Math.abs(touchMovement.x) > 0.1 || Math.abs(touchMovement.y) > 0.1)) {
+      moveX += touchMovement.x;
+      moveZ += touchMovement.y;
       isMoving = true;
     }
 
     // Normalize diagonal movement
-    if (moveX !== 0 && moveZ !== 0) {
+    if (moveX !== 0 || moveZ !== 0) {
       const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
       moveX /= length;
       moveZ /= length;
     }
 
     // Apply movement speed
-    const velocityX = moveX * speed;
-    const velocityZ = moveZ * speed;
+    const targetVelocityX = moveX * speed;
+    const targetVelocityZ = moveZ * speed;
 
-    // Set velocity (preserve Y for gravity)
-    bodyRef.current.setLinvel({ x: velocityX, y: velocity.y, z: velocityZ }, true);
+    // Smooth velocity change
+    const newVelocityX = THREE.MathUtils.lerp(velocity.x, targetVelocityX, 0.3);
+    const newVelocityZ = THREE.MathUtils.lerp(velocity.z, targetVelocityZ, 0.3);
+
+    // Set velocity (preserve Y for gravity, clamp to prevent ground penetration)
+    const clampedY = Math.max(velocity.y, position.y < 1.5 ? 0 : velocity.y);
+    bodyRef.current.setLinvel({ x: newVelocityX, y: clampedY, z: newVelocityZ }, true);
+
+    // Keep player above ground
+    if (position.y < 1.5) {
+      bodyRef.current.setTranslation({ x: position.x, y: 2, z: position.z }, true);
+    }
 
     // Jump only when on ground
     if (movement.jump && onGround) {
-      bodyRef.current.setLinvel({ x: velocityX, y: jumpForce, z: velocityZ }, true);
+      bodyRef.current.setLinvel({ x: newVelocityX, y: jumpForce, z: newVelocityZ }, true);
       setAnimation('jump');
       setMovement(m => ({ ...m, jump: false })); // Prevent continuous jumping
     }
@@ -212,8 +233,8 @@ function Player() {
     setMoving(isMoving);
 
     // Rotation based on movement
-    if (velocityX !== 0 || velocityZ !== 0) {
-      const angle = Math.atan2(velocityX, velocityZ);
+    if (newVelocityX !== 0 || newVelocityZ !== 0) {
+      const angle = Math.atan2(newVelocityX, newVelocityZ);
       meshRef.current.rotation.y = angle;
       updatePlayerRotation(angle);
     }
@@ -258,17 +279,18 @@ function Player() {
   return (
     <RigidBody 
       ref={bodyRef} 
-      position={[0, 3, 0]} 
+      position={[0, 5, 0]} 
       colliders={false} 
       lockRotations
       mass={1}
-      friction={1}
+      friction={0.5}
       restitution={0}
-      linearDamping={0.5}
+      linearDamping={2}
       angularDamping={1}
       enabledRotations={[false, true, false]}
+      ccd
     >
-      <CuboidCollider args={[0.4, 0.9, 0.4]} />
+      <CuboidCollider args={[0.4, 0.9, 0.4]} position={[0, 0, 0]} />
       <mesh ref={meshRef} castShadow>
         {/* Anime-style Body */}
         <boxGeometry args={[0.8, 1.8, 0.6]} />
@@ -343,6 +365,13 @@ function Player() {
       
       {/* Class-specific glow */}
       <pointLight color={getClassColor()} intensity={auraActive ? 3 : 1} distance={10} />
+      
+      {/* Mobile Controls */}
+      <MobileControls
+        onMove={(x, y) => setTouchMovement({ x, y })}
+        onJump={() => setMovement(m => ({ ...m, jump: true }))}
+        onTouch={setIsTouching}
+      />
     </RigidBody>
   );
 }
@@ -406,12 +435,12 @@ function Terrain() {
       <RigidBody 
         type="fixed" 
         colliders="cuboid"
-        friction={2}
+        friction={1.5}
         restitution={0}
       >
-        <mesh receiveShadow position={[0, 0, 0]}>
-          <boxGeometry args={[500, 2, 500]} />
-          <meshToonMaterial color="#4CAF50" />
+        <mesh receiveShadow position={[0, 0.5, 0]}>
+          <boxGeometry args={[500, 1, 500]} />
+          <meshToonMaterial color="#32CD32" />
         </mesh>
       </RigidBody>
       
