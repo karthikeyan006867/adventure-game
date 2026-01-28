@@ -65,7 +65,7 @@ function EnemyMesh({ enemy }: { enemy: any }) {
 }
 
 // Player Character Component
-function Player() {
+function Player({ mobileMove, mobileJump }: { mobileMove?: { x: number; y: number }, mobileJump?: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const bodyRef = useRef<any>(null);
   const auraRef = useRef<THREE.Mesh>(null);
@@ -90,11 +90,15 @@ function Player() {
     jump: false,
   });
 
-  const [touchMovement, setTouchMovement] = useState({ x: 0, y: 0 });
-  const [isTouching, setIsTouching] = useState(false);
-
   const speed = 6;
   const jumpForce = 7;
+
+  // Handle mobile jump
+  useEffect(() => {
+    if (mobileJump) {
+      setMovement(m => ({ ...m, jump: true }));
+    }
+  }, [mobileJump]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,9 +190,9 @@ function Player() {
     }
 
     // Mobile touch movement
-    if (isTouching && (Math.abs(touchMovement.x) > 0.1 || Math.abs(touchMovement.y) > 0.1)) {
-      moveX += touchMovement.x;
-      moveZ += touchMovement.y;
+    if (mobileMove && (Math.abs(mobileMove.x) > 0.1 || Math.abs(mobileMove.y) > 0.1)) {
+      moveX += mobileMove.x;
+      moveZ += mobileMove.y;
       isMoving = true;
     }
 
@@ -365,13 +369,6 @@ function Player() {
       
       {/* Class-specific glow */}
       <pointLight color={getClassColor()} intensity={auraActive ? 3 : 1} distance={10} />
-      
-      {/* Mobile Controls */}
-      <MobileControls
-        onMove={(x, y) => setTouchMovement({ x, y })}
-        onJump={() => setMovement(m => ({ ...m, jump: true }))}
-        onTouch={setIsTouching}
-      />
     </RigidBody>
   );
 }
@@ -533,6 +530,8 @@ function EnvironmentEffects() {
 
 export default function Game3D() {
   const { enemies, spawnEnemies } = useGameStore();
+  const [mobileMove, setMobileMove] = useState({ x: 0, y: 0 });
+  const [mobileJump, setMobileJump] = useState(false);
   
   // Spawn initial enemies
   useEffect(() => {
@@ -541,8 +540,13 @@ export default function Game3D() {
     }
   }, []);
   
+  const handleJump = () => {
+    setMobileJump(true);
+    setTimeout(() => setMobileJump(false), 100);
+  };
+  
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Canvas shadows camera={{ position: [0, 8, 12], fov: 75 }}>
         <Sky sunPosition={[100, 20, 100]} />
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
@@ -563,7 +567,7 @@ export default function Game3D() {
         <fog attach="fog" args={['#87CEEB', 50, 150]} />
         
         <Physics gravity={[0, -20, 0]} timeStep={1/60}>
-          <Player />
+          <Player mobileMove={mobileMove} mobileJump={mobileJump} />
           <PetCompanion />
           <Terrain />
           
@@ -576,6 +580,13 @@ export default function Game3D() {
         <EnvironmentEffects />
         <Environment preset="sunset" />
       </Canvas>
+      
+      {/* Mobile Controls - Outside Canvas */}
+      <MobileControls
+        onMove={(x, y) => setMobileMove({ x, y })}
+        onJump={handleJump}
+        onTouch={() => {}}
+      />
     </div>
   );
 }
