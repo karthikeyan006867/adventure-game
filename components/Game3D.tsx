@@ -156,46 +156,56 @@ function Player() {
     const velocity = bodyRef.current.linvel();
     const position = bodyRef.current.translation();
     
-    let velocityX = velocity.x;
-    let velocityZ = velocity.z;
+    // Check if on ground (important for jumping)
+    const onGround = Math.abs(velocity.y) < 0.5 && position.y < 4;
+    
+    let moveX = 0;
+    let moveZ = 0;
     let isMoving = false;
 
-    // Movement
+    // Calculate movement direction
     if (movement.forward) {
-      velocityZ = -speed;
+      moveZ = -1;
       isMoving = true;
     }
     if (movement.backward) {
-      velocityZ = speed;
+      moveZ = 1;
       isMoving = true;
     }
     if (movement.left) {
-      velocityX = -speed;
+      moveX = -1;
       isMoving = true;
     }
     if (movement.right) {
-      velocityX = speed;
+      moveX = 1;
       isMoving = true;
     }
 
     // Normalize diagonal movement
-    if ((movement.forward || movement.backward) && (movement.left || movement.right)) {
-      velocityX *= 0.707;
-      velocityZ *= 0.707;
+    if (moveX !== 0 && moveZ !== 0) {
+      const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
+      moveX /= length;
+      moveZ /= length;
     }
 
+    // Apply movement speed
+    const velocityX = moveX * speed;
+    const velocityZ = moveZ * speed;
+
+    // Set velocity (preserve Y for gravity)
     bodyRef.current.setLinvel({ x: velocityX, y: velocity.y, z: velocityZ }, true);
 
-    // Jump
-    if (movement.jump && Math.abs(velocity.y) < 0.1) {
+    // Jump only when on ground
+    if (movement.jump && onGround) {
       bodyRef.current.setLinvel({ x: velocityX, y: jumpForce, z: velocityZ }, true);
       setAnimation('jump');
+      setMovement(m => ({ ...m, jump: false })); // Prevent continuous jumping
     }
 
-    // Update animation
-    if (isMoving && currentAnimation !== 'jump') {
+    // Update animation based on state
+    if (isMoving && onGround) {
       setAnimation('run');
-    } else if (!isMoving && currentAnimation !== 'jump') {
+    } else if (onGround) {
       setAnimation('idle');
     }
 
@@ -214,12 +224,18 @@ function Player() {
       auraRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 3) * 0.1);
     }
 
-    // Update camera to follow player
-    camera.position.lerp(
-      new THREE.Vector3(position.x, position.y + 10, position.z + 15),
-      0.1
+    // MMORPG-style third-person camera
+    const cameraOffset = new THREE.Vector3(0, 8, 12);
+    const targetCameraPosition = new THREE.Vector3(
+      position.x + cameraOffset.x,
+      position.y + cameraOffset.y,
+      position.z + cameraOffset.z
     );
-    camera.lookAt(position.x, position.y + 2, position.z);
+    
+    camera.position.lerp(targetCameraPosition, 0.15);
+    
+    const lookAtTarget = new THREE.Vector3(position.x, position.y + 1, position.z);
+    camera.lookAt(lookAtTarget);
 
     updatePlayerPosition([position.x, position.y, position.z]);
   });
@@ -240,8 +256,19 @@ function Player() {
   };
 
   return (
-    <RigidBody ref={bodyRef} position={[0, 5, 0]} colliders={false} lockRotations>
-      <CuboidCollider args={[0.5, 1, 0.5]} />
+    <RigidBody 
+      ref={bodyRef} 
+      position={[0, 3, 0]} 
+      colliders={false} 
+      lockRotations
+      mass={1}
+      friction={1}
+      restitution={0}
+      linearDamping={0.5}
+      angularDamping={1}
+      enabledRotations={[false, true, false]}
+    >
+      <CuboidCollider args={[0.4, 0.9, 0.4]} />
       <mesh ref={meshRef} castShadow>
         {/* Anime-style Body */}
         <boxGeometry args={[0.8, 1.8, 0.6]} />
@@ -375,19 +402,16 @@ function Terrain() {
   
   return (
     <>
-      {/* Anime-style Ground with grass pattern */}
-      <RigidBody type="fixed" colliders="cuboid">
+      {/* Solid Ground Platform */}
+      <RigidBody 
+        type="fixed" 
+        colliders="cuboid"
+        friction={2}
+        restitution={0}
+      >
         <mesh receiveShadow position={[0, 0, 0]}>
-          <boxGeometry args={[300, 1, 300]} />
+          <boxGeometry args={[500, 2, 500]} />
           <meshToonMaterial color="#4CAF50" />
-        </mesh>
-      </RigidBody>
-      
-      {/* Underground support */}
-      <RigidBody type="fixed" colliders="cuboid">
-        <mesh position={[0, -5, 0]}>
-          <boxGeometry args={[300, 10, 300]} />
-          <meshToonMaterial color="#8B4513" />
         </mesh>
       </RigidBody>
       
@@ -490,20 +514,26 @@ export default function Game3D() {
   
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
-      <Canvas shadows camera={{ position: [0, 10, 15], fov: 60 }}>
+      <Canvas shadows camera={{ position: [0, 8, 12], fov: 75 }}>
         <Sky sunPosition={[100, 20, 100]} />
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-        <ambientLight intensity={0.4} />
+        <ambientLight intensity={0.6} />
         <directionalLight
-          position={[10, 10, 5]}
-          intensity={1}
+          position={[50, 50, 25]}
+          intensity={1.5}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
+          shadow-camera-far={100}
+          shadow-camera-left={-50}
+          shadow-camera-right={50}
+          shadow-camera-top={50}
+          shadow-camera-bottom={-50}
         />
-        <fog attach="fog" args={['#87CEEB', 30, 100]} />
+        <hemisphereLight intensity={0.3} color="#87CEEB" groundColor="#4CAF50" />
+        <fog attach="fog" args={['#87CEEB', 50, 150]} />
         
-        <Physics gravity={[0, -9.81, 0]}>
+        <Physics gravity={[0, -20, 0]} timeStep={1/60}>
           <Player />
           <PetCompanion />
           <Terrain />
